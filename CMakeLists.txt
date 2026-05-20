@@ -53,3 +53,18 @@ install(EXPORT ${PROJECT_NAME}Targets
 
 # Optional: build shared library
 option(BUILD_SHARED_LIBS "Build shared library" OFF)
+
+# Testing
+option(BUILD_TESTING "Build tests" ON)
+
+if(BUILD_TESTING)
+    enable_testing()
+
+    add_executable(test_apdu
+        tests/test_apdu.c
+    )
+    target_link_libraries(test_apdu PRIVATE ${PROJECT_NAME})
+    target_include_directories(test_apdu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+    add_test(NAME test_apdu COMMAND test_apdu)
+endif()
