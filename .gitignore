@@ -1,0 +1,62 @@
+# Build directories
+build/
+build-*/
+out/
+cmake-build-*/
+
+# IDE files
+.vs/
+.vscode/
+.idea/
+*.sln
+*.suo
+*.vcxproj*
+*.vcxproj.user
+*.vcxproj.filters
+*.opensdf
+*.opendb
+
+# Compiled files
+*.obj
+*.o
+*.lib
+*.dll
+*.exe
+*.exp
+*.pdb
+*.ilk
+*.dylib
+*.so
+*.a
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+*.cmake
+!install/*.cmake
+CMakeUserPresets.json
+
+# Compiled Python/scripts
+__pycache__/
+*.pyc
+*.pyo
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor temp files
+*~
+*.swp
+*.swo
+*.tmp
+
+# Clangd
+.clangd
+compile_commands.json
+
+# LICENSES/ directory should be tracked (contains license texts)
