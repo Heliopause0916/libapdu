@@ -115,6 +115,7 @@ int apdu_encode(const apdu_t *apdu, unsigned int proto, u8 *out, size_t outlen)
              * at a higher level. Here we just reject. */
             if (apdu->lc > 255)
                 return APDU_ERROR_INVALID_ARGUMENTS;
+            *p++ = (u8)apdu->lc;
         } else {
             /* T1 uses 3 bytes for length */
             *p++ = (u8)0x00;

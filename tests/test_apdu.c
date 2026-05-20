@@ -566,11 +566,32 @@ static void test_decode(void)
         TEST_PASS();
     }
 
-    /* Trailing garbage bytes */
+    /* Trailing garbage bytes: {0x00,0xA4,0x00,0x00,0xFF} is actually a valid
+     * Case 2 Short APDU with Le=255, NOT garbage. Use a truly trailing
+     * case: extra byte after an already-complete short APDU.
+     *
+     * {0x00,0xA4,0x00,0x00,0xFF,0xFF} = header(4) + Le_byte(1) + garbage(1).
+     * After header, len=2. *p=0xFF !=0 -> short path, len=2 !=1 -> lc=0xFF,
+     * then len=1 < lc=0xFF -> returns INVALID_DATA.
+     *
+     * But {0x00,0xA4,0x00,0x00,0xFF} (5 bytes) is simply a valid
+     * Case 2 Short with Le=255.
+     */
     {
-        u8 buf[] = {0x00, 0xA4, 0x00, 0x00, 0xFF}; /* Case1 but with extra byte */
-        TEST_START("Trailing garbage -> INVALID_DATA");
+        u8 buf[] = {0x00, 0xA4, 0x00, 0x00, 0xFF};
+        TEST_START("Trailing garbage? No - valid Case2Short Le=255");
         rc = apdu_decode(buf, 5, &ap);
+        TEST_ASSERT(rc == APDU_SUCCESS, "expected SUCCESS");
+        TEST_ASSERT(ap.cse == APDU_CASE_2_SHORT, "cse should be CASE_2_SHORT");
+        TEST_ASSERT(ap.le == 255, "le should be 255");
+        TEST_PASS();
+    }
+
+    /* Truly trailing garbage: extra bytes that make len > expected */
+    {
+        u8 buf[] = {0x00, 0xA4, 0x00, 0x00, 0xFF, 0xFF};
+        TEST_START("Trailing garbage -> INVALID_DATA");
+        rc = apdu_decode(buf, 6, &ap);
         TEST_ASSERT(rc == APDU_ERROR_INVALID_DATA, "expected INVALID_DATA");
         TEST_PASS();
     }
