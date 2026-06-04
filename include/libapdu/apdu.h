@@ -30,6 +30,23 @@
 extern "C" {
 #endif
 
+/* ================ Export Macro ================ */
+
+#ifdef _WIN32
+#  ifdef LIBAPDU_BUILD_DLL
+     /* Building the DLL */
+#    define LIBAPDU_API __declspec(dllexport)
+#  elif defined(LIBAPDU_USE_DLL)
+     /* Using the DLL */
+#    define LIBAPDU_API __declspec(dllimport)
+#  else
+     /* Static library */
+#    define LIBAPDU_API
+#  endif
+#else
+#  define LIBAPDU_API
+#endif
+
 /* ================ Type Aliases ================ */
 
 typedef uint8_t u8;
@@ -106,7 +123,7 @@ typedef struct apdu {
  * @param proto  Protocol (APDU_PROTO_T0 or APDU_PROTO_T1)
  * @return Encoded length in bytes, or 0 on invalid input
  */
-size_t apdu_get_length(const apdu_t *apdu, unsigned int proto);
+LIBAPDU_API size_t apdu_get_length(const apdu_t *apdu, unsigned int proto);
 
 /**
  * Encode an APDU structure into a byte string.
@@ -117,7 +134,7 @@ size_t apdu_get_length(const apdu_t *apdu, unsigned int proto);
  * @param outlen  Size of output buffer
  * @return APDU_SUCCESS on success, APDU_ERROR_INVALID_ARGUMENTS if buffer too small
  */
-int apdu_encode(const apdu_t *apdu, unsigned int proto, u8 *out, size_t outlen);
+LIBAPDU_API int apdu_encode(const apdu_t *apdu, unsigned int proto, u8 *out, size_t outlen);
 
 /**
  * Allocate a buffer and encode an APDU into it.
@@ -129,7 +146,7 @@ int apdu_encode(const apdu_t *apdu, unsigned int proto, u8 *out, size_t outlen);
  * @param proto  Protocol (APDU_PROTO_T0 or APDU_PROTO_T1)
  * @return APDU_SUCCESS on success, or an error code
  */
-int apdu_alloc_and_encode(const apdu_t *apdu, u8 **buf, size_t *len, unsigned int proto);
+LIBAPDU_API int apdu_alloc_and_encode(const apdu_t *apdu, u8 **buf, size_t *len, unsigned int proto);
 
 /**
  * Decode a byte string into an APDU structure.
@@ -142,7 +159,7 @@ int apdu_alloc_and_encode(const apdu_t *apdu, u8 **buf, size_t *len, unsigned in
  * @param apdu  Output APDU structure (will be zero-initialized then filled)
  * @return APDU_SUCCESS on success, or an error code
  */
-int apdu_decode(const u8 *buf, size_t len, apdu_t *apdu);
+LIBAPDU_API int apdu_decode(const u8 *buf, size_t len, apdu_t *apdu);
 
 /**
  * Set response data and status words (SW1, SW2) on an APDU structure.
@@ -155,7 +172,7 @@ int apdu_decode(const u8 *buf, size_t len, apdu_t *apdu);
  * @param len   Length of response data (must be >= 2)
  * @return APDU_SUCCESS on success, APDU_ERROR_INTERNAL if len < 2
  */
-int apdu_set_response(apdu_t *apdu, const u8 *buf, size_t len);
+LIBAPDU_API int apdu_set_response(apdu_t *apdu, const u8 *buf, size_t len);
 
 /**
  * Calculate the encoded length of an R-APDU in octets.
@@ -163,7 +180,7 @@ int apdu_set_response(apdu_t *apdu, const u8 *buf, size_t len);
  * @param apdu  APDU structure containing resplen, sw1, sw2
  * @return Encoded length in bytes (resplen + 2), or 0 if apdu is NULL
  */
-size_t apdu_get_response_length(const apdu_t *apdu);
+LIBAPDU_API size_t apdu_get_response_length(const apdu_t *apdu);
 
 /**
  * Encode response data and status words into a byte string.
@@ -172,8 +189,11 @@ size_t apdu_get_response_length(const apdu_t *apdu);
  * @param out     Output buffer
  * @param outlen  Size of output buffer
  * @return APDU_SUCCESS on success, APDU_ERROR_INVALID_ARGUMENTS on invalid args
+ *
+ * @note If resplen > 0, resp must not be NULL; otherwise APDU_ERROR_INVALID_ARGUMENTS
+ *       is returned to avoid writing uninitialized data to the output buffer.
  */
-int apdu_encode_response(const apdu_t *apdu, u8 *out, size_t outlen);
+LIBAPDU_API int apdu_encode_response(const apdu_t *apdu, u8 *out, size_t outlen);
 
 /**
  * Allocate a buffer and encode an R-APDU into it.
@@ -184,7 +204,7 @@ int apdu_encode_response(const apdu_t *apdu, u8 *out, size_t outlen);
  * @param len   Output length of encoded R-APDU
  * @return APDU_SUCCESS on success, or an error code
  */
-int apdu_alloc_and_encode_response(const apdu_t *apdu, u8 **buf, size_t *len);
+LIBAPDU_API int apdu_alloc_and_encode_response(const apdu_t *apdu, u8 **buf, size_t *len);
 
 #ifdef __cplusplus
 }
