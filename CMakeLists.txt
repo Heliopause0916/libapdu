@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(libapdu VERSION 1.0.0 LANGUAGES C)
+project(libapdu VERSION 1.0.1 LANGUAGES C)
 
 # Output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
