@@ -157,6 +157,35 @@ int apdu_decode(const u8 *buf, size_t len, apdu_t *apdu);
  */
 int apdu_set_response(apdu_t *apdu, const u8 *buf, size_t len);
 
+/**
+ * Calculate the encoded length of an R-APDU in octets.
+ *
+ * @param apdu  APDU structure containing resplen, sw1, sw2
+ * @return Encoded length in bytes (resplen + 2), or 0 if apdu is NULL
+ */
+size_t apdu_get_response_length(const apdu_t *apdu);
+
+/**
+ * Encode response data and status words into a byte string.
+ *
+ * @param apdu    APDU structure containing resp, resplen, sw1, sw2
+ * @param out     Output buffer
+ * @param outlen  Size of output buffer
+ * @return APDU_SUCCESS on success, APDU_ERROR_INVALID_ARGUMENTS on invalid args
+ */
+int apdu_encode_response(const apdu_t *apdu, u8 *out, size_t outlen);
+
+/**
+ * Allocate a buffer and encode an R-APDU into it.
+ * The caller must free() the returned buffer.
+ *
+ * @param apdu  APDU structure containing resp, resplen, sw1, sw2
+ * @param buf   Output pointer to allocated buffer
+ * @param len   Output length of encoded R-APDU
+ * @return APDU_SUCCESS on success, or an error code
+ */
+int apdu_alloc_and_encode_response(const apdu_t *apdu, u8 **buf, size_t *len);
+
 #ifdef __cplusplus
 }
 #endif

@@ -4,7 +4,7 @@
 
 A single C99 static library, extracted from [OpenSC](https://github.com/OpenSC/OpenSC) `src/libopensc/apdu.c`, retaining only pure APDU parsing and assembly logic.
 
-- Only 2 source files: `include/libapdu/apdu.h` (163 lines) + `src/apdu.c` (309 lines)
+- Only 2 source files: `include/libapdu/apdu.h` (193 lines) + `src/apdu.c` (373 lines)
 - No external dependencies, only C99 standard library required
 - No tests, no CI, no lint/format configuration
 - License: LGPL-2.1-or-later
@@ -34,11 +34,15 @@ Key settings: `-std=c99`, `-Iinclude` (header search path), `unused-parameter` d
 | `apdu_decode()` | After decoding, `apdu->data` points into the input buffer; **caller must keep the input buffer alive while the apdu is in use** |
 | `apdu_alloc_and_encode()` | Allocates memory via `malloc()` internally; **caller must `free()`** |
 | `apdu_encode()` | Caller provides the output buffer; pre-calculate size via `apdu_get_length()` |
+| `apdu_alloc_and_encode_response()` | Allocates memory via `malloc()` internally; **caller must `free()`** |
+| `apdu_encode_response()` | Caller provides the output buffer; pre-calculate size via `apdu_get_response_length()` |
+| `apdu_get_response_length()` | No memory allocation; returns length calculation only |
 
 ## Struct Notes
 
-- `apdu_t` fields `mac[8]`/`mac_len`, `control`, and `next` pointer are legacy compatibility fields from OpenSC — none of the 5 API functions use them
+- `apdu_t` fields `mac[8]`/`mac_len`, `control`, and `next` pointer are legacy compatibility fields from OpenSC — none of the 8 API functions use them
 - `apdu_t.resplen`: on input, indicates buffer size; after decoding a response, updated to the actual returned data length
+- `apdu_t.resp`, `apdu_t.resplen`, `apdu_t.sw1`, `apdu_t.sw2`: used for R-APDU encoding (response assembly)
 
 ## Error Codes
 

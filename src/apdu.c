@@ -309,3 +309,65 @@ int apdu_set_response(apdu_t *apdu, const u8 *buf, size_t len)
 
     return APDU_SUCCESS;
 }
+
+/* ================================================================ */
+/*  R-APDU encoding (response -> byte string)                       */
+/* ================================================================ */
+
+size_t apdu_get_response_length(const apdu_t *apdu)
+{
+    if (apdu == NULL)
+        return 0;
+
+    return apdu->resplen + 2;  /* response data + SW1 + SW2 */
+}
+
+int apdu_encode_response(const apdu_t *apdu, u8 *out, size_t outlen)
+{
+    size_t len;
+    u8    *p;
+
+    if (apdu == NULL || out == NULL)
+        return APDU_ERROR_INVALID_ARGUMENTS;
+
+    len = apdu_get_response_length(apdu);
+    if (outlen < len)
+        return APDU_ERROR_INVALID_ARGUMENTS;
+
+    p = out;
+
+    /* Copy response data */
+    if (apdu->resplen > 0 && apdu->resp != NULL)
+        memcpy(p, apdu->resp, apdu->resplen);
+    p += apdu->resplen;
+
+    /* Append SW1 and SW2 */
+    *p++ = (u8)apdu->sw1;
+    *p   = (u8)apdu->sw2;
+
+    return APDU_SUCCESS;
+}
+
+int apdu_alloc_and_encode_response(const apdu_t *apdu, u8 **buf, size_t *len)
+{
+    size_t nlen;
+    u8    *nbuf;
+
+    if (apdu == NULL || buf == NULL || len == NULL)
+        return APDU_ERROR_INVALID_ARGUMENTS;
+
+    nlen = apdu_get_response_length(apdu);
+
+    nbuf = (u8 *)malloc(nlen);
+    if (nbuf == NULL)
+        return APDU_ERROR_OUT_OF_MEMORY;
+
+    if (apdu_encode_response(apdu, nbuf, nlen) != APDU_SUCCESS) {
+        free(nbuf);
+        return APDU_ERROR_INTERNAL;
+    }
+
+    *buf = nbuf;
+    *len = nlen;
+    return APDU_SUCCESS;
+}
