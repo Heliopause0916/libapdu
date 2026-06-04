@@ -4,7 +4,7 @@
 
 A single C99 static library, extracted from [OpenSC](https://github.com/OpenSC/OpenSC) `src/libopensc/apdu.c`, retaining only pure APDU parsing and assembly logic.
 
-- Only 2 source files: `include/libapdu/apdu.h` (213 lines) + `src/apdu.c` (379 lines)
+- Only 2 source files: `include/libapdu/apdu.h` (229 lines) + `src/apdu.c` (397 lines)
 - No external dependencies, only C99 standard library required
 - No CI, no lint/format configuration
 - License: LGPL-2.1-or-later
@@ -29,13 +29,16 @@ Key settings: `-std=c99`, `-Iinclude` (header search path), `unused-parameter` d
 
 ## API Memory Semantics (Gotchas)
 
+### Default Behavior
+By default, `apdu_alloc_and_encode()` and `apdu_alloc_and_encode_response()` use standard `malloc()`/`free()`. For embedded environments, call `apdu_set_allocator()` once at program startup to configure custom memory allocators.
+
 | Function | Caller Responsibility |
 |----------|----------------------|
 | `apdu_decode()` | After decoding, `apdu->data` points into the input buffer; **caller must keep the input buffer alive while the apdu is in use** |
-| `apdu_alloc_and_encode()` | Allocates memory via `malloc()` internally; **caller must `free()`** |
+| `apdu_alloc_and_encode()` | Allocates memory via configured allocator (default: `malloc()`); **caller must free via configured deallocator** |
 | `apdu_encode()` | Caller provides the output buffer; pre-calculate size via `apdu_get_length()` |
 | `apdu_set_response()` | Copies response data into `apdu->resp` buffer (caller-allocated); **caller must ensure `resp` buffer is large enough** |
-| `apdu_alloc_and_encode_response()` | Allocates memory via `malloc()` internally; **caller must `free()`** |
+| `apdu_alloc_and_encode_response()` | Allocates memory via configured allocator (default: `malloc()`); **caller must free via configured deallocator** |
 | `apdu_encode_response()` | Caller provides the output buffer; pre-calculate size via `apdu_get_response_length()` |
 | `apdu_get_response_length()` | No memory allocation; returns length calculation only |
 
@@ -44,6 +47,35 @@ Key settings: `-std=c99`, `-Iinclude` (header search path), `unused-parameter` d
 - `apdu_t` fields `mac[8]`/`mac_len`, `control`, and `next` pointer are legacy compatibility fields from OpenSC — none of the 8 API functions use them
 - `apdu_t.resplen`: on input, indicates buffer size; after decoding a response, updated to the actual returned data length
 - `apdu_t.resp`, `apdu_t.resplen`, `apdu_t.sw1`, `apdu_t.sw2`: used for R-APDU encoding (response assembly)
+
+## Custom Memory Allocator
+
+```c
+void apdu_set_allocator(apdu_alloc_fn alloc, apdu_free_fn free);
+```
+
+Configures custom memory allocator for embedded environments. Call once at program startup.
+
+| Parameter | Description |
+|-----------|-------------|
+| `alloc` | Allocation function matching `void* (*)(size_t)` signature. `NULL` restores default `malloc`. |
+| `free` | Deallocation function matching `void (*)(void*)` signature. `NULL` restores default `free`. |
+
+**Usage Example:**
+```c
+void* my_alloc(size_t size) { return my_pool_alloc(size); }
+void my_free(void *ptr) { my_pool_free(ptr); }
+
+int main(void) {
+    apdu_set_allocator(my_alloc, my_free);
+    // ... rest of program
+}
+```
+
+**Notes:**
+- Both parameters must be set together, or both `NULL` to restore defaults
+- Not thread-safe; call during single-threaded initialization only
+- After setting custom allocators, caller must use matching deallocator to free memory
 
 ## Error Codes
 

@@ -14,6 +14,7 @@
 - **短帧与扩展帧 APDU** — 解析时自动检测，编码时支持手动或自动选择
 - **无外部依赖** — 仅需 C99 标准库
 - **体积小巧** — 编译后的静态库约 13 KB
+- **可配置内存分配器** — 支持嵌入式环境
 
 ## API 概览
 
@@ -51,6 +52,17 @@ int apdu_encode_response(const apdu_t *apdu, u8 *out, size_t outlen);
 
 // 分配缓冲区并编码 R-APDU（调用者需 free()）
 int apdu_alloc_and_encode_response(const apdu_t *apdu, u8 **buf, size_t *len);
+
+/* ==== 内存分配器配置 ==== */
+
+/**
+ * 为嵌入式环境设置自定义内存分配器。
+ * 在程序启动时、任何编码操作之前调用一次。
+ * @param alloc  内存分配函数，传入 NULL 恢复默认 malloc
+ * @param free   内存释放函数，传入 NULL 恢复默认 free
+ * @note 非线程安全；仅在单线程初始化时调用
+ */
+void apdu_set_allocator(apdu_alloc_fn alloc, apdu_free_fn free);
 ```
 
 ## 示例

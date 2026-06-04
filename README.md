@@ -14,6 +14,7 @@ A lightweight, platform-independent C library for APDU (Application Protocol Dat
 - **Short and Extended APDUs** — Automatic detection during parsing, manual or auto mode during encoding
 - **No external dependencies** — Requires only a C99 standard library
 - **Small footprint** — Compiled static library ≈ 13 KB
+- **Configurable memory allocator** — For embedded environments
 
 ## API Overview
 
@@ -51,6 +52,17 @@ int apdu_encode_response(const apdu_t *apdu, u8 *out, size_t outlen);
 
 // Allocate a buffer and encode an R-APDU into it (caller must free())
 int apdu_alloc_and_encode_response(const apdu_t *apdu, u8 **buf, size_t *len);
+
+/* ==== Memory Allocator Configuration ==== */
+
+/**
+ * Set custom memory allocator for embedded environments.
+ * Call once at program startup before any encode operations.
+ * @param alloc  Memory allocation function, or NULL to restore default malloc
+ * @param free   Memory free function, or NULL to restore default free
+ * @note Not thread-safe; call during single-threaded initialization only
+ */
+void apdu_set_allocator(apdu_alloc_fn alloc, apdu_free_fn free);
 ```
 
 ## Example

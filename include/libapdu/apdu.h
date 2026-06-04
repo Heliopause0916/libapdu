@@ -114,6 +114,22 @@ typedef struct apdu {
     struct apdu *next;       /* Linked list for command chaining */
 } apdu_t;
 
+/* ================ Memory Allocator Callbacks ================ */
+
+typedef void* (*apdu_alloc_fn)(size_t size);
+typedef void (*apdu_free_fn)(void *ptr);
+
+/**
+ * Set custom memory allocator functions.
+ *
+ * @param alloc   Memory allocation function, or NULL to restore default malloc
+ * @param free_fn Memory free function, or NULL to restore default free
+ *
+ * @note Both alloc and free must be set together, or both set to NULL
+ * @note This function is not thread-safe; call once during initialization
+ */
+LIBAPDU_API void apdu_set_allocator(apdu_alloc_fn alloc, apdu_free_fn free_fn);
+
 /* ================ API Functions ================ */
 
 /**

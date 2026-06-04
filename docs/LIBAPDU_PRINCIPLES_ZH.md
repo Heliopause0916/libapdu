@@ -31,6 +31,7 @@ libapdu 是一个轻量级的 C99 静态库，用于 APDU（Application Protocol
     - [3.6 `apdu_get_response_length()`](#36-apdu_get_response_length)
     - [3.7 `apdu_encode_response()`](#37-apdu_encode_response)
     - [3.8 `apdu_alloc_and_encode_response()`](#38-apdu_alloc_and_encode_response)
+    - [3.9 `apdu_set_allocator()`](#39-apdu_set_allocator)
   - [4. 编解码流程](#4-编解码流程)
     - [4.1 命令 APDU 解码流程](#41-命令-apdu-解码流程)
     - [4.2 APDU 编码流程](#42-apdu-编码流程)
@@ -607,6 +608,43 @@ if (ret == APDU_SUCCESS) {
 }
 ```
 
+### 3.9 `apdu_set_allocator()`
+
+**函数签名：**
+
+```c
+void apdu_set_allocator(apdu_alloc_fn alloc, apdu_free_fn free);
+```
+
+**功能说明：**
+
+为嵌入式环境配置自定义内存分配器。在程序启动时调用一次，在任何编码操作之前。
+
+**参数说明：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `alloc` | `apdu_alloc_fn` | 分配函数，签名匹配 `void* (*)(size_t)`。传入 `NULL` 恢复默认 `malloc`。 |
+| `free_fn` | `apdu_free_fn` | 释放函数，签名匹配 `void (*)(void*)`。传入 `NULL` 恢复默认 `free`。 |
+
+**使用示例：**
+
+```c
+void* my_alloc(size_t size) { return my_pool_alloc(size); }
+void my_free(void *ptr) { my_pool_free(ptr); }
+
+int main(void) {
+    apdu_set_allocator(my_alloc, my_free);
+    // ... 程序其余部分
+}
+```
+
+**注意事项：**
+- 两个参数必须同时设置，或同时为 `NULL` 恢复默认值
+- 非线程安全，仅应在单线程初始化阶段调用
+- 设置自定义分配器后，调用者必须使用匹配的释放函数来释放内存
+- 部分 `NULL` 组合（一个 NULL，一个非 NULL）将恢复默认分配器
+
 ---
 
 ## 4. 编解码流程
@@ -826,12 +864,13 @@ libapdu 的 API 设计遵循明确的内存管理规则：
 |------|----------|-----------|
 | `apdu_decode()` | 无分配 | 保持输入缓冲区有效，直到不再使用 `apdu` |
 | `apdu_encode()` | 无分配 | 预先分配足够大的输出缓冲区 |
-| `apdu_alloc_and_encode()` | 内部 `malloc()` | 使用后调用 `free()` 释放返回的缓冲区 |
+| `apdu_alloc_and_encode()` | 通过配置的分配器分配内存（默认：`malloc()`）；**调用者须使用配置的释放函数释放** |
 | `apdu_get_length()` | 无分配 | 无 |
 | `apdu_set_response()` | 无分配 | 保持响应缓冲区有效 |
 | `apdu_get_response_length()` | 无分配 | 无 |
 | `apdu_encode_response()` | 无分配 | 预先分配足够大的输出缓冲区 |
-| `apdu_alloc_and_encode_response()` | 内部 `malloc()` | 使用后调用 `free()` 释放返回的缓冲区 |
+| `apdu_alloc_and_encode_response()` | 通过配置的分配器分配内存（默认：`malloc()`）；**调用者须使用配置的释放函数释放** |
+| `apdu_set_allocator()` | 无分配 | 在启动时调用一次，在任何编码操作之前 |
 
 **关键注意事项：**
 

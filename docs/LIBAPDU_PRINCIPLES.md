@@ -31,6 +31,7 @@ This document provides a detailed analysis of libapdu's core principles, includi
     - [3.6 `apdu_get_response_length()`](#36-apdu_get_response_length)
     - [3.7 `apdu_encode_response()`](#37-apdu_encode_response)
     - [3.8 `apdu_alloc_and_encode_response()`](#38-apdu_alloc_and_encode_response)
+    - [3.9 `apdu_set_allocator()`](#39-apdu_set_allocator)
   - [4. Encoding and Decoding Flows](#4-encoding-and-decoding-flows)
     - [4.1 Command APDU Decoding Flow](#41-command-apdu-decoding-flow)
     - [4.2 APDU Encoding Flow](#42-apdu-encoding-flow)
@@ -597,6 +598,43 @@ if (ret == APDU_SUCCESS) {
 }
 ```
 
+### 3.9 `apdu_set_allocator()`
+
+**Function Signature:**
+
+```c
+void apdu_set_allocator(apdu_alloc_fn alloc, apdu_free_fn free);
+```
+
+**Description:**
+
+Configures custom memory allocator for embedded environments. Call once at program startup before any encode operations.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `alloc` | `apdu_alloc_fn` | Allocation function matching `void* (*)(size_t)` signature. Pass `NULL` to restore default `malloc`. |
+| `free_fn` | `apdu_free_fn` | Deallocation function matching `void (*)(void*)` signature. Pass `NULL` to restore default `free`. |
+
+**Usage Example:**
+
+```c
+void* my_alloc(size_t size) { return my_pool_alloc(size); }
+void my_free(void *ptr) { my_pool_free(ptr); }
+
+int main(void) {
+    apdu_set_allocator(my_alloc, my_free);
+    // ... rest of program
+}
+```
+
+**Notes:**
+- Both parameters must be set together, or both `NULL` to restore defaults
+- Not thread-safe; call during single-threaded initialization only
+- After setting custom allocators, caller must use matching deallocator to free memory
+- Partial `NULL` combination (one NULL, one non-NULL) will restore default allocators
+
 ---
 
 ## 4. Encoding and Decoding Flows
@@ -816,12 +854,13 @@ libapdu's API design follows clear memory management rules:
 |----------|-------------------|----------------------|
 | `apdu_decode()` | No allocation | Keep input buffer valid until `apdu` is no longer in use |
 | `apdu_encode()` | No allocation | Pre-allocate sufficiently large output buffer |
-| `apdu_alloc_and_encode()` | Internal `malloc()` | Call `free()` to release returned buffer after use |
+| `apdu_alloc_and_encode()` | Allocates memory via configured allocator (default: `malloc()`); **caller must free via configured deallocator** |
 | `apdu_get_length()` | No allocation | None |
 | `apdu_set_response()` | No allocation | Keep response buffer valid |
 | `apdu_get_response_length()` | No allocation | None |
 | `apdu_encode_response()` | No allocation | Pre-allocate sufficiently large output buffer |
-| `apdu_alloc_and_encode_response()` | Internal `malloc()` | Call `free()` to release returned buffer after use |
+| `apdu_alloc_and_encode_response()` | Allocates memory via configured allocator (default: `malloc()`); **caller must free via configured deallocator** |
+| `apdu_set_allocator()` | No allocation | Call once at startup before any encode operations |
 
 **Key Notes:**
 

@@ -26,6 +26,28 @@
 #include "libapdu/apdu.h"
 
 /* ================================================================ */
+/*  Global memory allocator                                         */
+/* ================================================================ */
+
+static apdu_alloc_fn g_alloc = malloc;
+static apdu_free_fn g_free = free;
+
+void apdu_set_allocator(apdu_alloc_fn alloc, apdu_free_fn free_fn)
+{
+    if (alloc == NULL && free_fn == NULL) {
+        g_alloc = malloc;
+        g_free = free;
+    } else if (alloc != NULL && free_fn != NULL) {
+        g_alloc = alloc;
+        g_free = free_fn;
+    } else {
+        /* Invalid partial NULL combination - restore defaults */
+        g_alloc = malloc;
+        g_free = free;
+    }
+}
+
+/* ================================================================ */
 /*  Low-level APDU length calculation                               */
 /* ================================================================ */
 
@@ -169,12 +191,12 @@ int apdu_alloc_and_encode(const apdu_t *apdu, u8 **buf, size_t *len, unsigned in
     if (nlen == 0)
         return APDU_ERROR_INTERNAL;
 
-    nbuf = (u8 *)malloc(nlen);
+    nbuf = (u8 *)g_alloc(nlen);
     if (nbuf == NULL)
         return APDU_ERROR_OUT_OF_MEMORY;
 
     if (apdu_encode(apdu, proto, nbuf, nlen) != APDU_SUCCESS) {
-        free(nbuf);
+        g_free(nbuf);
         return APDU_ERROR_INTERNAL;
     }
 
@@ -364,12 +386,12 @@ int apdu_alloc_and_encode_response(const apdu_t *apdu, u8 **buf, size_t *len)
 
     nlen = apdu_get_response_length(apdu);
 
-    nbuf = (u8 *)malloc(nlen);
+    nbuf = (u8 *)g_alloc(nlen);
     if (nbuf == NULL)
         return APDU_ERROR_OUT_OF_MEMORY;
 
     if (apdu_encode_response(apdu, nbuf, nlen) != APDU_SUCCESS) {
-        free(nbuf);
+        g_free(nbuf);
         return APDU_ERROR_INTERNAL;
     }
 
