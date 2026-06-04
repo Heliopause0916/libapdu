@@ -4,9 +4,9 @@
 
 A single C99 static library, extracted from [OpenSC](https://github.com/OpenSC/OpenSC) `src/libopensc/apdu.c`, retaining only pure APDU parsing and assembly logic.
 
-- Only 2 source files: `include/libapdu/apdu.h` (193 lines) + `src/apdu.c` (373 lines)
+- Only 2 source files: `include/libapdu/apdu.h` (213 lines) + `src/apdu.c` (379 lines)
 - No external dependencies, only C99 standard library required
-- No tests, no CI, no lint/format configuration
+- No CI, no lint/format configuration
 - License: LGPL-2.1-or-later
 
 ## Build
@@ -34,6 +34,7 @@ Key settings: `-std=c99`, `-Iinclude` (header search path), `unused-parameter` d
 | `apdu_decode()` | After decoding, `apdu->data` points into the input buffer; **caller must keep the input buffer alive while the apdu is in use** |
 | `apdu_alloc_and_encode()` | Allocates memory via `malloc()` internally; **caller must `free()`** |
 | `apdu_encode()` | Caller provides the output buffer; pre-calculate size via `apdu_get_length()` |
+| `apdu_set_response()` | Copies response data into `apdu->resp` buffer (caller-allocated); **caller must ensure `resp` buffer is large enough** |
 | `apdu_alloc_and_encode_response()` | Allocates memory via `malloc()` internally; **caller must `free()`** |
 | `apdu_encode_response()` | Caller provides the output buffer; pre-calculate size via `apdu_get_response_length()` |
 | `apdu_get_response_length()` | No memory allocation; returns length calculation only |
@@ -54,11 +55,12 @@ Key settings: `-std=c99`, `-Iinclude` (header search path), `unused-parameter` d
 | `APDU_ERROR_INTERNAL` | `-1400` | `SC_ERROR_INTERNAL` |
 | `APDU_ERROR_OUT_OF_MEMORY` | `-1404` | `SC_ERROR_OUT_OF_MEMORY` |
 
-## No Tests & No CI
+## No CI
 
-The project currently has zero test code or CI configuration. If adding them:
-- Testing: consider CMake's built-in `enable_testing()` + simple C test files
+The project currently has no CI configuration. If adding it:
 - CI: GitHub Actions (Linux + Windows matrix build)
+
+Tests are located in `tests/test_apdu.c`.
 
 ## .clangd vs compile_commands.json
 

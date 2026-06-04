@@ -20,6 +20,13 @@ A lightweight, platform-independent C library for APDU (Application Protocol Dat
 ```c
 #include <libapdu/apdu.h>
 
+/* ==== C-APDU Decoding ==== */
+
+// Decode a byte string into an APDU structure
+int apdu_decode(const u8 *buf, size_t len, apdu_t *apdu);
+
+/* ==== C-APDU Encoding ==== */
+
 // Calculate the encoded length of an APDU
 size_t apdu_get_length(const apdu_t *apdu, unsigned int proto);
 
@@ -29,11 +36,21 @@ int apdu_encode(const apdu_t *apdu, unsigned int proto, u8 *out, size_t outlen);
 // Allocate a buffer and encode an APDU into it (caller must free())
 int apdu_alloc_and_encode(const apdu_t *apdu, u8 **buf, size_t *len, unsigned int proto);
 
-// Decode a byte string into an APDU structure
-int apdu_decode(const u8 *buf, size_t len, apdu_t *apdu);
+/* ==== R-APDU Setup ==== */
 
 // Set response data and status words (SW1, SW2)
 int apdu_set_response(apdu_t *apdu, const u8 *buf, size_t len);
+
+/* ==== R-APDU Encoding ==== */
+
+// Calculate the encoded length of an R-APDU
+size_t apdu_get_response_length(const apdu_t *apdu);
+
+// Encode response data and status words into a byte string
+int apdu_encode_response(const apdu_t *apdu, u8 *out, size_t outlen);
+
+// Allocate a buffer and encode an R-APDU into it (caller must free())
+int apdu_alloc_and_encode_response(const apdu_t *apdu, u8 **buf, size_t *len);
 ```
 
 ## Example

@@ -20,6 +20,13 @@
 ```c
 #include <libapdu/apdu.h>
 
+/* ==== C-APDU 解码 ==== */
+
+// 将字节流解码为 APDU 结构
+int apdu_decode(const u8 *buf, size_t len, apdu_t *apdu);
+
+/* ==== C-APDU 编码 ==== */
+
 // 计算 APDU 编码后的字节长度
 size_t apdu_get_length(const apdu_t *apdu, unsigned int proto);
 
@@ -29,11 +36,21 @@ int apdu_encode(const apdu_t *apdu, unsigned int proto, u8 *out, size_t outlen);
 // 分配缓冲区并编码 APDU（调用者需 free()）
 int apdu_alloc_and_encode(const apdu_t *apdu, u8 **buf, size_t *len, unsigned int proto);
 
-// 将字节流解码为 APDU 结构
-int apdu_decode(const u8 *buf, size_t len, apdu_t *apdu);
+/* ==== R-APDU 设置 ==== */
 
 // 设置响应数据及状态字（SW1, SW2）
 int apdu_set_response(apdu_t *apdu, const u8 *buf, size_t len);
+
+/* ==== R-APDU 编码 ==== */
+
+// 计算 R-APDU 编码后的字节长度
+size_t apdu_get_response_length(const apdu_t *apdu);
+
+// 将响应数据和状态字编码为字节流
+int apdu_encode_response(const apdu_t *apdu, u8 *out, size_t outlen);
+
+// 分配缓冲区并编码 R-APDU（调用者需 free()）
+int apdu_alloc_and_encode_response(const apdu_t *apdu, u8 **buf, size_t *len);
 ```
 
 ## 示例

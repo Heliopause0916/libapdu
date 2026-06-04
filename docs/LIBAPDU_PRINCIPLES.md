@@ -10,35 +10,45 @@ This document provides a detailed analysis of libapdu's core principles, includi
 
 ## Table of Contents
 
-1. [APDU Basic Concepts](#1-apdu-basic-concepts)
-   - [What is APDU](#11-what-is-apdu)
-   - [Command APDU Structure](#12-command-apdu-c-apdu)
-   - [Response APDU Structure](#13-response-apdu-r-apdu)
-   - [Four APDU Cases](#14-four-apdu-cases)
-2. [Data Structure Analysis](#2-data-structure-analysis)
-   - [apdu_t Structure](#21-apdu_t-structure)
-   - [Field Meanings](#22-field-meanings)
-   - [Key Constants](#23-key-constants)
-3. [API Function Details](#3-api-function-details)
-   - [apdu_get_length()](#31-apdu_get_length)
-   - [apdu_encode()](#32-apdu_encode)
-   - [apdu_alloc_and_encode()](#33-apdu_alloc_and_encode)
-   - [apdu_decode()](#34-apdu_decode)
-   - [apdu_set_response()](#35-apdu_set_response)
-4. [Encoding and Decoding Flows](#4-encoding-and-decoding-flows)
-   - [Command APDU Decoding Flow](#41-command-apdu-decoding-flow)
-   - [APDU Encoding Flow](#42-apdu-encoding-flow)
-   - [Short APDU vs Extended APDU](#43-short-apdu-vs-extended-apdu)
-5. [Error Handling](#5-error-handling)
-   - [Error Code Definitions](#51-error-code-definitions)
-   - [Error Return Scenarios by Function](#52-error-return-scenarios-by-function)
-6. [Key Implementation Details](#6-key-implementation-details)
-   - [Byte Order Handling](#61-byte-order-handling)
-   - [Length Field Processing](#62-length-field-processing)
-   - [T0 vs T1 Protocol Differences](#63-t0-vs-t1-protocol-differences)
-   - [Boundary Condition Handling](#64-boundary-condition-handling)
-7. [Memory Semantics and Caller Responsibilities](#7-memory-semantics-and-caller-responsibilities)
-8. [Summary](#8-summary)
+- [libapdu Library Principles](#libapdu-library-principles)
+  - [Introduction](#introduction)
+  - [Table of Contents](#table-of-contents)
+  - [1. APDU Basic Concepts](#1-apdu-basic-concepts)
+    - [1.1 What is APDU](#11-what-is-apdu)
+    - [1.2 Command APDU (C-APDU)](#12-command-apdu-c-apdu)
+    - [1.3 Response APDU (R-APDU)](#13-response-apdu-r-apdu)
+    - [1.4 Four APDU Cases](#14-four-apdu-cases)
+  - [2. Data Structure Analysis](#2-data-structure-analysis)
+    - [2.1 `apdu_t` Structure](#21-apdu_t-structure)
+    - [2.2 Field Meanings](#22-field-meanings)
+    - [2.3 Key Constants](#23-key-constants)
+  - [3. API Function Details](#3-api-function-details)
+    - [3.1 `apdu_get_length()`](#31-apdu_get_length)
+    - [3.2 `apdu_encode()`](#32-apdu_encode)
+    - [3.3 `apdu_alloc_and_encode()`](#33-apdu_alloc_and_encode)
+    - [3.4 `apdu_decode()`](#34-apdu_decode)
+    - [3.5 `apdu_set_response()`](#35-apdu_set_response)
+    - [3.6 `apdu_get_response_length()`](#36-apdu_get_response_length)
+    - [3.7 `apdu_encode_response()`](#37-apdu_encode_response)
+    - [3.8 `apdu_alloc_and_encode_response()`](#38-apdu_alloc_and_encode_response)
+  - [4. Encoding and Decoding Flows](#4-encoding-and-decoding-flows)
+    - [4.1 Command APDU Decoding Flow](#41-command-apdu-decoding-flow)
+    - [4.2 APDU Encoding Flow](#42-apdu-encoding-flow)
+    - [4.3 Short APDU vs Extended APDU](#43-short-apdu-vs-extended-apdu)
+  - [5. Error Handling](#5-error-handling)
+    - [5.1 Error Code Definitions](#51-error-code-definitions)
+    - [5.2 Error Return Scenarios by Function](#52-error-return-scenarios-by-function)
+  - [6. Key Implementation Details](#6-key-implementation-details)
+    - [6.1 Byte Order Handling](#61-byte-order-handling)
+    - [6.2 Length Field Processing](#62-length-field-processing)
+    - [6.3 T0 vs T1 Protocol Differences](#63-t0-vs-t1-protocol-differences)
+    - [6.4 Boundary Condition Handling](#64-boundary-condition-handling)
+  - [7. Memory Semantics and Caller Responsibilities](#7-memory-semantics-and-caller-responsibilities)
+  - [8. Summary](#8-summary)
+    - [Design Features](#design-features)
+    - [API Design](#api-design)
+    - [Legacy Compatibility](#legacy-compatibility)
+  - [References](#references)
 
 ---
 
@@ -197,7 +207,7 @@ typedef struct apdu {
 
 ## 3. API Function Details
 
-libapdu provides 5 core API functions:
+libapdu provides 8 core API functions:
 
 ### 3.1 `apdu_get_length()`
 
@@ -429,6 +439,164 @@ int ret = apdu_set_response(&apdu, response, sizeof(response));
 // apdu.resplen = 2 (data length)
 ```
 
+### 3.6 `apdu_get_response_length()`
+
+**Function Signature:**
+
+```c
+size_t apdu_get_response_length(const apdu_t *apdu);
+```
+
+**Description:**
+
+Calculates the byte length needed to encode an R-APDU (Response APDU). Used to pre-determine the buffer size needed for response encoding.
+
+**Parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `apdu` | Pointer to APDU structure containing `resplen`, `sw1`, `sw2` |
+
+**Return Value:**
+
+| Return Value | Description |
+|--------------|-------------|
+| `length > 0` | Encoded byte length (`resplen + 2`) |
+| `0` | `apdu` is NULL |
+
+**Length Calculation:**
+
+R-APDU encoding format: `[Response Data (resplen bytes)] + [SW1] + [SW2]`
+
+```
+Total Length = resplen + 2 (SW1 + SW2)
+```
+
+**Overflow Protection:**
+
+If `resplen + 2` would overflow `SIZE_MAX`, the function returns `SIZE_MAX` as a safe upper bound.
+
+**Usage Example:**
+
+```c
+apdu_t apdu = { /* ... */ };
+apdu.resplen = 10;
+apdu.sw1 = 0x90;
+apdu.sw2 = 0x00;
+
+size_t len = apdu_get_response_length(&apdu);
+// len = 10 + 2 = 12
+```
+
+### 3.7 `apdu_encode_response()`
+
+**Function Signature:**
+
+```c
+int apdu_encode_response(const apdu_t *apdu, u8 *out, size_t outlen);
+```
+
+**Description:**
+
+Encodes response data and status words from an APDU structure into a byte sequence. The caller must pre-allocate the output buffer.
+
+**Parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `apdu` | APDU structure containing `resp`, `resplen`, `sw1`, `sw2` |
+| `out` | Output buffer |
+| `outlen` | Output buffer size |
+
+**Return Value:**
+
+| Return Value | Description |
+|--------------|-------------|
+| `APDU_SUCCESS` (0) | Encoding successful |
+| `APDU_ERROR_INVALID_ARGUMENTS` (-1300) | `apdu` or `out` is NULL, buffer too small, or `resplen > 0` but `resp` is NULL |
+| `APDU_ERROR_INTERNAL` (-1400) | Length overflow (`resplen + 2` exceeds `SIZE_MAX`) |
+
+**Encoding Process:**
+
+1. Write response data (`resp[0..resplen-1]`) to output buffer
+2. Write SW1 as the next byte
+3. Write SW2 as the final byte
+
+**Usage Example:**
+
+```c
+apdu_t apdu = { /* ... */ };
+u8 resp_data[] = {0x3F, 0x00};
+apdu.resp = resp_data;
+apdu.resplen = 2;
+apdu.sw1 = 0x90;
+apdu.sw2 = 0x00;
+
+size_t len = apdu_get_response_length(&apdu);
+u8 *buf = malloc(len);
+
+int ret = apdu_encode_response(&apdu, buf, len);
+// buf = {0x3F, 0x00, 0x90, 0x00}
+//       [Data]      [SW1] [SW2]
+
+free(buf);
+```
+
+### 3.8 `apdu_alloc_and_encode_response()`
+
+**Function Signature:**
+
+```c
+int apdu_alloc_and_encode_response(const apdu_t *apdu, u8 **buf, size_t *len);
+```
+
+**Description:**
+
+Allocates memory and encodes an R-APDU. Automatically allocates the required buffer internally, simplifying the calling process.
+
+**Parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `apdu` | APDU structure containing `resp`, `resplen`, `sw1`, `sw2` |
+| `buf` | Output parameter, pointer to allocated buffer |
+| `len` | Output parameter, encoded length |
+
+**Return Value:**
+
+| Return Value | Description |
+|--------------|-------------|
+| `APDU_SUCCESS` | Encoding successful |
+| `APDU_ERROR_INVALID_ARGUMENTS` | `apdu`, `buf`, or `len` is NULL, or `resplen > 0` but `resp` is NULL |
+| `APDU_ERROR_INTERNAL` | Length overflow or encoding failed |
+| `APDU_ERROR_OUT_OF_MEMORY` | Memory allocation failed |
+
+**Memory Semantics:**
+
+- The function allocates memory internally via `malloc()`
+- **The caller must call `free()` when no longer needed**
+
+**Usage Example:**
+
+```c
+apdu_t apdu = { /* ... */ };
+u8 resp_data[] = {0x3F, 0x00};
+apdu.resp = resp_data;
+apdu.resplen = 2;
+apdu.sw1 = 0x90;
+apdu.sw2 = 0x00;
+
+u8 *buf = NULL;
+size_t len = 0;
+
+int ret = apdu_alloc_and_encode_response(&apdu, &buf, &len);
+if (ret == APDU_SUCCESS) {
+    // buf = {0x3F, 0x00, 0x90, 0x00}, len = 4
+    // Use buf...
+    free(buf);  // Remember to free!
+}
+```
+
 ---
 
 ## 4. Encoding and Decoding Flows
@@ -534,6 +702,15 @@ flowchart TD
 | `apdu_decode` | `INVALID_DATA` | Insufficient extended APDU data |
 | `apdu_decode` | `INVALID_DATA` | Remaining data after parsing |
 | `apdu_set_response` | `INTERNAL` | `len < 2` |
+| `apdu_get_response_length` | `0` | `apdu` is NULL |
+| `apdu_encode_response` | `INVALID_ARGUMENTS` | `apdu` or `out` is NULL |
+| `apdu_encode_response` | `INVALID_ARGUMENTS` | Buffer too small |
+| `apdu_encode_response` | `INVALID_ARGUMENTS` | `resplen > 0` but `resp` is NULL |
+| `apdu_encode_response` | `INTERNAL` | Length overflow (`resplen + 2` exceeds `SIZE_MAX`) |
+| `apdu_alloc_and_encode_response` | `INVALID_ARGUMENTS` | `apdu`, `buf`, or `len` is NULL |
+| `apdu_alloc_and_encode_response` | `INVALID_ARGUMENTS` | `resplen > 0` but `resp` is NULL |
+| `apdu_alloc_and_encode_response` | `INTERNAL` | Length overflow or encoding failed |
+| `apdu_alloc_and_encode_response` | `OUT_OF_MEMORY` | `malloc()` failed |
 
 ---
 
@@ -642,6 +819,9 @@ libapdu's API design follows clear memory management rules:
 | `apdu_alloc_and_encode()` | Internal `malloc()` | Call `free()` to release returned buffer after use |
 | `apdu_get_length()` | No allocation | None |
 | `apdu_set_response()` | No allocation | Keep response buffer valid |
+| `apdu_get_response_length()` | No allocation | None |
+| `apdu_encode_response()` | No allocation | Pre-allocate sufficiently large output buffer |
+| `apdu_alloc_and_encode_response()` | Internal `malloc()` | Call `free()` to release returned buffer after use |
 
 **Key Notes:**
 
@@ -668,11 +848,14 @@ libapdu is a streamlined, efficient APDU encoding/decoding library with the foll
 
 | API | Function | Typical Use Case |
 |-----|----------|------------------|
-| `apdu_get_length()` | Calculate encoded length | Pre-allocate buffer |
-| `apdu_encode()` | Encode to caller's buffer | Known buffer size |
-| `apdu_alloc_and_encode()` | Allocate and encode | Simplify calling process |
+| `apdu_get_length()` | Calculate C-APDU encoded length | Pre-allocate buffer |
+| `apdu_encode()` | Encode C-APDU to caller's buffer | Known buffer size |
+| `apdu_alloc_and_encode()` | Allocate and encode C-APDU | Simplify calling process |
 | `apdu_decode()` | Decode to structure | Parse received command |
-| `apdu_set_response()` | Set response data | Handle response |
+| `apdu_set_response()` | Set response data | Parse received response |
+| `apdu_get_response_length()` | Calculate R-APDU encoded length | Pre-allocate buffer |
+| `apdu_encode_response()` | Encode R-APDU to caller's buffer | Known buffer size |
+| `apdu_alloc_and_encode_response()` | Allocate and encode R-APDU | Simplify calling process |
 
 ### Legacy Compatibility
 

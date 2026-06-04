@@ -10,35 +10,55 @@ libapdu 是一个轻量级的 C99 静态库，用于 APDU（Application Protocol
 
 ## 目录
 
-1. [APDU 基础概念](#1-apdu-基础概念)
-   - [什么是 APDU](#11-什么是-apdu)
-   - [命令 APDU 结构](#12-命令-apducommand-apdu--c-apdu)
-   - [响应 APDU 结构](#13-响应-apduresponse-apdu--r-apdu)
-   - [APDU 的四种 Case](#14-apdu-的四种-case情况)
-2. [数据结构解析](#2-数据结构解析)
-   - [apdu_t 结构体](#21-apdu_t-结构体)
-   - [字段含义详解](#22-字段含义详解)
-   - [关键常量定义](#23-关键常量定义)
-3. [API 函数详解](#3-api-函数详解)
-   - [apdu_get_length()](#31-apdu_get_length)
-   - [apdu_encode()](#32-apdu_encode)
-   - [apdu_alloc_and_encode()](#33-apdu_alloc_and_encode)
-   - [apdu_decode()](#34-apdu_decode)
-   - [apdu_set_response()](#35-apdu_set_response)
-4. [编解码流程](#4-编解码流程)
-   - [命令 APDU 解码流程](#41-命令-apdu-解码流程)
-   - [APDU 编码流程](#42-apdu-编码流程)
-   - [短 APDU vs 扩展 APDU](#43-短-apdu-vs-扩展-apdu)
-5. [错误处理](#5-错误处理)
+- [libapdu 库原理解析](#libapdu-库原理解析)
+  - [简介](#简介)
+  - [目录](#目录)
+  - [1. APDU 基础概念](#1-apdu-基础概念)
+    - [1.1 什么是 APDU](#11-什么是-apdu)
+    - [1.2 命令 APDU（Command APDU / C-APDU）](#12-命令-apducommand-apdu--c-apdu)
+    - [1.3 响应 APDU（Response APDU / R-APDU）](#13-响应-apduresponse-apdu--r-apdu)
+    - [1.4 APDU 的四种 Case（情况）](#14-apdu-的四种-case情况)
+  - [2. 数据结构解析](#2-数据结构解析)
+    - [2.1 `apdu_t` 结构体](#21-apdu_t-结构体)
+    - [2.2 字段含义详解](#22-字段含义详解)
+    - [2.3 关键常量定义](#23-关键常量定义)
+  - [3. API 函数详解](#3-api-函数详解)
+    - [3.1 `apdu_get_length()`](#31-apdu_get_length)
+    - [3.2 `apdu_encode()`](#32-apdu_encode)
+    - [3.3 `apdu_alloc_and_encode()`](#33-apdu_alloc_and_encode)
+    - [3.4 `apdu_decode()`](#34-apdu_decode)
+    - [3.5 `apdu_set_response()`](#35-apdu_set_response)
+    - [3.6 `apdu_get_response_length()`](#36-apdu_get_response_length)
+    - [3.7 `apdu_encode_response()`](#37-apdu_encode_response)
+    - [3.8 `apdu_alloc_and_encode_response()`](#38-apdu_alloc_and_encode_response)
+  - [4. 编解码流程](#4-编解码流程)
+    - [4.1 命令 APDU 解码流程](#41-命令-apdu-解码流程)
+    - [4.2 APDU 编码流程](#42-apdu-编码流程)
+    - [4.3 短 APDU vs 扩展 APDU](#43-短-apdu-vs-扩展-apdu)
+  - [5. 错误处理](#5-错误处理)
+    - [5.1 错误码定义](#51-错误码定义)
+    - [5.2 各函数错误返回场景](#52-各函数错误返回场景)
+  - [6. 关键实现细节](#6-关键实现细节)
+    - [6.1 字节序处理](#61-字节序处理)
+    - [6.2 长度字段处理](#62-长度字段处理)
+    - [6.3 T0 vs T1 协议差异](#63-t0-vs-t1-协议差异)
+    - [6.4 边界条件处理](#64-边界条件处理)
+  - [7. 内存语义与调用者责任](#7-内存语义与调用者责任)
+  - [8. 总结](#8-总结)
+    - [设计特点](#设计特点)
+    - [API 设计](#api-设计)
+    - [遗留兼容](#遗留兼容)
+  - [参考资料](#参考资料)
+4. [错误处理](#5-错误处理)
    - [错误码定义](#51-错误码定义)
    - [各函数错误返回场景](#52-各函数错误返回场景)
-6. [关键实现细节](#6-关键实现细节)
+5. [关键实现细节](#6-关键实现细节)
    - [字节序处理](#61-字节序处理)
    - [长度字段处理](#62-长度字段处理)
    - [T0 vs T1 协议差异](#63-t0-vs-t1-协议差异)
    - [边界条件处理](#64-边界条件处理)
-7. [内存语义与调用者责任](#7-内存语义与调用者责任)
-8. [总结](#8-总结)
+6. [内存语义与调用者责任](#7-内存语义与调用者责任)
+7. [总结](#8-总结)
 
 ---
 
@@ -197,7 +217,7 @@ typedef struct apdu {
 
 ## 3. API 函数详解
 
-libapdu 提供 5 个核心 API 函数：
+libapdu 提供 8 个核心 API 函数：
 
 ### 3.1 `apdu_get_length()`
 
@@ -429,6 +449,164 @@ int ret = apdu_set_response(&apdu, response, sizeof(response));
 // apdu.resplen = 2 (数据长度)
 ```
 
+### 3.6 `apdu_get_response_length()`
+
+**函数签名：**
+
+```c
+size_t apdu_get_response_length(const apdu_t *apdu);
+```
+
+**功能说明：**
+
+计算 R-APDU（响应 APDU）编码所需的字节长度。用于预先确定响应编码所需的缓冲区大小。
+
+**参数说明：**
+
+| 参数 | 说明 |
+|------|------|
+| `apdu` | 包含 `resplen`、`sw1`、`sw2` 的 APDU 结构体指针 |
+
+**返回值：**
+
+| 返回值 | 说明 |
+|--------|------|
+| `length > 0` | 编码后的字节长度（`resplen + 2`）|
+| `0` | `apdu` 为 NULL |
+
+**长度计算：**
+
+R-APDU 编码格式：`[响应数据（resplen 字节）] + [SW1] + [SW2]`
+
+```
+总长度 = resplen + 2（SW1 + SW2）
+```
+
+**溢出保护：**
+
+如果 `resplen + 2` 会溢出 `SIZE_MAX`，函数返回 `SIZE_MAX` 作为安全的上限值。
+
+**使用示例：**
+
+```c
+apdu_t apdu = { /* ... */ };
+apdu.resplen = 10;
+apdu.sw1 = 0x90;
+apdu.sw2 = 0x00;
+
+size_t len = apdu_get_response_length(&apdu);
+// len = 10 + 2 = 12
+```
+
+### 3.7 `apdu_encode_response()`
+
+**函数签名：**
+
+```c
+int apdu_encode_response(const apdu_t *apdu, u8 *out, size_t outlen);
+```
+
+**功能说明：**
+
+将 APDU 结构体中的响应数据和状态字编码为字节序列。调用者需预先分配输出缓冲区。
+
+**参数说明：**
+
+| 参数 | 说明 |
+|------|------|
+| `apdu` | 包含 `resp`、`resplen`、`sw1`、`sw2` 的 APDU 结构体 |
+| `out` | 输出缓冲区 |
+| `outlen` | 输出缓冲区大小 |
+
+**返回值：**
+
+| 返回值 | 说明 |
+|--------|------|
+| `APDU_SUCCESS`（0）| 编码成功 |
+| `APDU_ERROR_INVALID_ARGUMENTS`（-1300）| `apdu` 或 `out` 为 NULL，或缓冲区过小，或 `resplen > 0` 但 `resp` 为 NULL |
+| `APDU_ERROR_INTERNAL`（-1400）| 长度溢出（`resplen + 2` 超过 `SIZE_MAX`）|
+
+**编码过程：**
+
+1. 将响应数据（`resp[0..resplen-1]`）写入输出缓冲区
+2. 将 SW1 写入下一个字节
+3. 将 SW2 写入最后一个字节
+
+**使用示例：**
+
+```c
+apdu_t apdu = { /* ... */ };
+u8 resp_data[] = {0x3F, 0x00};
+apdu.resp = resp_data;
+apdu.resplen = 2;
+apdu.sw1 = 0x90;
+apdu.sw2 = 0x00;
+
+size_t len = apdu_get_response_length(&apdu);
+u8 *buf = malloc(len);
+
+int ret = apdu_encode_response(&apdu, buf, len);
+// buf = {0x3F, 0x00, 0x90, 0x00}
+//       [数据]      [SW1] [SW2]
+
+free(buf);
+```
+
+### 3.8 `apdu_alloc_and_encode_response()`
+
+**函数签名：**
+
+```c
+int apdu_alloc_and_encode_response(const apdu_t *apdu, u8 **buf, size_t *len);
+```
+
+**功能说明：**
+
+分配内存并编码 R-APDU。内部自动分配所需缓冲区，简化调用流程。
+
+**参数说明：**
+
+| 参数 | 说明 |
+|------|------|
+| `apdu` | 包含 `resp`、`resplen`、`sw1`、`sw2` 的 APDU 结构体 |
+| `buf` | 输出参数，指向分配的缓冲区指针 |
+| `len` | 输出参数，编码后的长度 |
+
+**返回值：**
+
+| 返回值 | 说明 |
+|--------|------|
+| `APDU_SUCCESS` | 编码成功 |
+| `APDU_ERROR_INVALID_ARGUMENTS` | `apdu`、`buf` 或 `len` 为 NULL，或 `resplen > 0` 但 `resp` 为 NULL |
+| `APDU_ERROR_INTERNAL` | 长度溢出或编码失败 |
+| `APDU_ERROR_OUT_OF_MEMORY` | 内存分配失败 |
+
+**内存语义：**
+
+- 函数内部通过 `malloc()` 分配内存
+- **调用者必须在不再使用时调用 `free()` 释放**
+
+**使用示例：**
+
+```c
+apdu_t apdu = { /* ... */ };
+u8 resp_data[] = {0x3F, 0x00};
+apdu.resp = resp_data;
+apdu.resplen = 2;
+apdu.sw1 = 0x90;
+apdu.sw2 = 0x00;
+
+u8 *buf = NULL;
+size_t len = 0;
+
+int ret = apdu_alloc_and_encode_response(&apdu, &buf, &len);
+if (ret == APDU_SUCCESS) {
+    // buf = {0x3F, 0x00, 0x90, 0x00}, len = 4
+    // 使用 buf...
+    free(buf);  // 记得释放！
+}
+```
+
 ---
 
 ## 4. 编解码流程
@@ -534,6 +712,15 @@ flowchart TD
 | `apdu_decode` | `INVALID_DATA` | 扩展 APDU 数据不足 |
 | `apdu_decode` | `INVALID_DATA` | 解析后仍有剩余数据 |
 | `apdu_set_response` | `INTERNAL` | `len < 2` |
+| `apdu_get_response_length` | `0` | `apdu` 为 NULL |
+| `apdu_encode_response` | `INVALID_ARGUMENTS` | `apdu` 或 `out` 为 NULL |
+| `apdu_encode_response` | `INVALID_ARGUMENTS` | 缓冲区过小 |
+| `apdu_encode_response` | `INVALID_ARGUMENTS` | `resplen > 0` 但 `resp` 为 NULL |
+| `apdu_encode_response` | `INTERNAL` | 长度溢出（`resplen + 2` 超过 `SIZE_MAX`）|
+| `apdu_alloc_and_encode_response` | `INVALID_ARGUMENTS` | `apdu`、`buf` 或 `len` 为 NULL |
+| `apdu_alloc_and_encode_response` | `INVALID_ARGUMENTS` | `resplen > 0` 但 `resp` 为 NULL |
+| `apdu_alloc_and_encode_response` | `INTERNAL` | 长度溢出或编码失败 |
+| `apdu_alloc_and_encode_response` | `OUT_OF_MEMORY` | `malloc()` 失败 |
 
 ---
 
@@ -642,6 +829,9 @@ libapdu 的 API 设计遵循明确的内存管理规则：
 | `apdu_alloc_and_encode()` | 内部 `malloc()` | 使用后调用 `free()` 释放返回的缓冲区 |
 | `apdu_get_length()` | 无分配 | 无 |
 | `apdu_set_response()` | 无分配 | 保持响应缓冲区有效 |
+| `apdu_get_response_length()` | 无分配 | 无 |
+| `apdu_encode_response()` | 无分配 | 预先分配足够大的输出缓冲区 |
+| `apdu_alloc_and_encode_response()` | 内部 `malloc()` | 使用后调用 `free()` 释放返回的缓冲区 |
 
 **关键注意事项：**
 
@@ -668,11 +858,14 @@ libapdu 是一个精简、高效的 APDU 编解码库，具有以下核心特点
 
 | API | 功能 | 典型使用场景 |
 |-----|------|-------------|
-| `apdu_get_length()` | 计算编码长度 | 预分配缓冲区 |
-| `apdu_encode()` | 编码到调用者缓冲区 | 已知缓冲区大小 |
-| `apdu_alloc_and_encode()` | 分配并编码 | 简化调用流程 |
+| `apdu_get_length()` | 计算 C-APDU 编码长度 | 预分配缓冲区 |
+| `apdu_encode()` | 编码 C-APDU 到调用者缓冲区 | 已知缓冲区大小 |
+| `apdu_alloc_and_encode()` | 分配并编码 C-APDU | 简化调用流程 |
 | `apdu_decode()` | 解码到结构体 | 解析接收到的命令 |
-| `apdu_set_response()` | 设置响应数据 | 处理响应 |
+| `apdu_set_response()` | 设置响应数据 | 解析接收到的响应 |
+| `apdu_get_response_length()` | 计算 R-APDU 编码长度 | 预分配缓冲区 |
+| `apdu_encode_response()` | 编码 R-APDU 到调用者缓冲区 | 已知缓冲区大小 |
+| `apdu_alloc_and_encode_response()` | 分配并编码 R-APDU | 简化调用流程 |
 
 ### 遗留兼容
 
