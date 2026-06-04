@@ -135,7 +135,7 @@ Add the following to your CMakeLists.txt:
 # Option A: FetchContent
 include(FetchContent)
 FetchContent_Declare(libapdu
-    GIT_REPOSITORY https://github.com/your-org/libapdu.git
+    GIT_REPOSITORY https://github.com/Heliopause0916/libapdu.git
     GIT_TAG        main
 )
 FetchContent_MakeAvailable(libapdu)
