@@ -694,6 +694,284 @@ static void test_set_response(void)
     }
 }
 
+/* ================ Test: apdu_get_response_length ================ */
+
+static void test_get_response_length(void)
+{
+    printf("[apdu_get_response_length]\n");
+
+    apdu_t ap;
+    size_t len;
+
+    /* resplen=0 → 返回 2（仅SW1+SW2） */
+    {
+        memset(&ap, 0, sizeof(ap));
+        ap.resplen = 0;
+        TEST_START("resplen=0 -> returns 2");
+        len = apdu_get_response_length(&ap);
+        TEST_ASSERT(len == 2, "expected 2");
+        TEST_PASS();
+    }
+
+    /* resplen=10 → 返回 12 */
+    {
+        memset(&ap, 0, sizeof(ap));
+        ap.resplen = 10;
+        TEST_START("resplen=10 -> returns 12");
+        len = apdu_get_response_length(&ap);
+        TEST_ASSERT(len == 12, "expected 12");
+        TEST_PASS();
+    }
+
+    /* resplen=255 → 返回 257（最大短响应） */
+    {
+        memset(&ap, 0, sizeof(ap));
+        ap.resplen = 255;
+        TEST_START("resplen=255 -> returns 257");
+        len = apdu_get_response_length(&ap);
+        TEST_ASSERT(len == 257, "expected 257");
+        TEST_PASS();
+    }
+
+    /* NULL apdu → 返回 0 */
+    TEST_START("NULL apdu -> returns 0");
+    len = apdu_get_response_length(NULL);
+    TEST_ASSERT(len == 0, "expected 0");
+    TEST_PASS();
+
+    /* 溢出检查：resplen=SIZE_MAX-1 → 返回 0 */
+    {
+        memset(&ap, 0, sizeof(ap));
+        ap.resplen = (size_t)-1;  /* SIZE_MAX */
+        TEST_START("resplen=SIZE_MAX -> returns 0 (overflow)");
+        len = apdu_get_response_length(&ap);
+        TEST_ASSERT(len == 0, "expected 0 (overflow protection)");
+        TEST_PASS();
+    }
+
+    /* 边界情况：resplen=SIZE_MAX-2 -> 应返回 SIZE_MAX */
+    {
+        memset(&ap, 0, sizeof(ap));
+        ap.resplen = (size_t)-3;  /* SIZE_MAX - 2 */
+        TEST_START("resplen=SIZE_MAX-2 -> returns SIZE_MAX (boundary)");
+        len = apdu_get_response_length(&ap);
+        TEST_ASSERT(len == (size_t)-1, "expected SIZE_MAX");
+        TEST_PASS();
+    }
+
+    /* 边界情况：resplen=SIZE_MAX-1 -> 溢出保护，返回 0 */
+    {
+        memset(&ap, 0, sizeof(ap));
+        ap.resplen = (size_t)-2;  /* SIZE_MAX - 1 */
+        TEST_START("resplen=SIZE_MAX-1 -> returns 0 (overflow)");
+        len = apdu_get_response_length(&ap);
+        TEST_ASSERT(len == 0, "expected 0 (overflow protection)");
+        TEST_PASS();
+    }
+}
+
+/* ================ Test: apdu_encode_response ================ */
+
+static void test_encode_response(void)
+{
+    printf("[apdu_encode_response]\n");
+
+    apdu_t ap;
+    u8 out[32];
+    int rc;
+
+    /* 正常编码：resp有数据，验证SW1/SW2正确追加 */
+    {
+        u8 resp_data[] = {0x01, 0x02, 0x03};
+        memset(&ap, 0, sizeof(ap));
+        ap.resp = resp_data;
+        ap.resplen = 3;
+        ap.sw1 = 0x90;
+        ap.sw2 = 0x00;
+
+        u8 expected[] = {0x01, 0x02, 0x03, 0x90, 0x00};
+
+        TEST_START("Normal encode: resp data + SW");
+        memset(out, 0xAA, sizeof(out));
+        rc = apdu_encode_response(&ap, out, sizeof(out));
+        TEST_ASSERT(rc == APDU_SUCCESS, "expected SUCCESS");
+        TEST_ASSERT(u8cmp(out, expected, 5) == 0, "bytes mismatch");
+        TEST_PASS();
+    }
+
+    /* 仅状态字：resplen=0，仅编码SW */
+    {
+        memset(&ap, 0, sizeof(ap));
+        ap.resp = NULL;
+        ap.resplen = 0;
+        ap.sw1 = 0x61;
+        ap.sw2 = 0x05;
+
+        u8 expected[] = {0x61, 0x05};
+
+        TEST_START("Only SW: resplen=0");
+        memset(out, 0xAA, sizeof(out));
+        rc = apdu_encode_response(&ap, out, sizeof(out));
+        TEST_ASSERT(rc == APDU_SUCCESS, "expected SUCCESS");
+        TEST_ASSERT(u8cmp(out, expected, 2) == 0, "bytes mismatch");
+        TEST_PASS();
+    }
+
+    /* 缓冲区不足：outlen < 实际需要，返回错误 */
+    {
+        u8 resp_data[] = {0x01, 0x02, 0x03, 0x04, 0x05};
+        memset(&ap, 0, sizeof(ap));
+        ap.resp = resp_data;
+        ap.resplen = 5;
+        ap.sw1 = 0x90;
+        ap.sw2 = 0x00;
+
+        TEST_START("Buffer too small (need 7, give 5)");
+        rc = apdu_encode_response(&ap, out, 5);
+        TEST_ASSERT(rc == APDU_ERROR_INVALID_ARGUMENTS, "expected INVALID_ARGUMENTS");
+        TEST_PASS();
+    }
+
+    /* NULL apdu → 返回 APDU_ERROR_INVALID_ARGUMENTS */
+    TEST_START("NULL apdu -> INVALID_ARGUMENTS");
+    rc = apdu_encode_response(NULL, out, sizeof(out));
+    TEST_ASSERT(rc == APDU_ERROR_INVALID_ARGUMENTS, "expected INVALID_ARGUMENTS");
+    TEST_PASS();
+
+    /* NULL out → 返回 APDU_ERROR_INVALID_ARGUMENTS */
+    {
+        memset(&ap, 0, sizeof(ap));
+        ap.resplen = 0;
+        ap.sw1 = 0x90;
+        ap.sw2 = 0x00;
+
+        TEST_START("NULL out -> INVALID_ARGUMENTS");
+        rc = apdu_encode_response(&ap, NULL, 10);
+        TEST_ASSERT(rc == APDU_ERROR_INVALID_ARGUMENTS, "expected INVALID_ARGUMENTS");
+        TEST_PASS();
+    }
+
+    /* 空指针验证：resplen>0 但 resp=NULL → 返回 APDU_ERROR_INVALID_ARGUMENTS */
+    {
+        memset(&ap, 0, sizeof(ap));
+        ap.resp = NULL;
+        ap.resplen = 5;  /* > 0 */
+        ap.sw1 = 0x90;
+        ap.sw2 = 0x00;
+
+        TEST_START("resplen>0 but resp=NULL -> INVALID_ARGUMENTS");
+        rc = apdu_encode_response(&ap, out, sizeof(out));
+        TEST_ASSERT(rc == APDU_ERROR_INVALID_ARGUMENTS, "expected INVALID_ARGUMENTS");
+        TEST_PASS();
+    }
+}
+
+/* ================ Test: apdu_alloc_and_encode_response ================ */
+
+static void test_alloc_and_encode_response(void)
+{
+    printf("[apdu_alloc_and_encode_response]\n");
+
+    u8 *buf = NULL;
+    size_t len = 0;
+    int rc;
+
+    /* 正常分配编码：验证内存分配、编码内容、返回值，然后 free() */
+    {
+        apdu_t ap;
+        u8 resp_data[] = {0xAA, 0xBB, 0xCC, 0xDD};
+        u8 expected[] = {0xAA, 0xBB, 0xCC, 0xDD, 0x90, 0x00};
+        memset(&ap, 0, sizeof(ap));
+        ap.resp = resp_data;
+        ap.resplen = 4;
+        ap.sw1 = 0x90;
+        ap.sw2 = 0x00;
+
+        TEST_START("Normal alloc and encode");
+        buf = NULL;
+        len = 0;
+        rc = apdu_alloc_and_encode_response(&ap, &buf, &len);
+        TEST_ASSERT(rc == APDU_SUCCESS, "expected SUCCESS");
+        TEST_ASSERT(buf != NULL, "buf should not be NULL");
+        TEST_ASSERT(len == 6, "expected length 6");
+        TEST_ASSERT(u8cmp(buf, expected, 6) == 0, "bytes mismatch");
+        free(buf);
+        TEST_PASS();
+    }
+
+    /* 仅状态字的分配编码 */
+    {
+        apdu_t ap;
+        u8 expected[] = {0x61, 0x03};
+        memset(&ap, 0, sizeof(ap));
+        ap.resp = NULL;
+        ap.resplen = 0;
+        ap.sw1 = 0x61;
+        ap.sw2 = 0x03;
+
+        TEST_START("Alloc and encode: only SW (no data)");
+        buf = NULL;
+        len = 0;
+        rc = apdu_alloc_and_encode_response(&ap, &buf, &len);
+        TEST_ASSERT(rc == APDU_SUCCESS, "expected SUCCESS");
+        TEST_ASSERT(buf != NULL, "buf should not be NULL");
+        TEST_ASSERT(len == 2, "expected length 2");
+        TEST_ASSERT(u8cmp(buf, expected, 2) == 0, "bytes mismatch");
+        free(buf);
+        TEST_PASS();
+    }
+
+    /* NULL apdu → 返回 APDU_ERROR_INVALID_ARGUMENTS */
+    TEST_START("NULL apdu -> INVALID_ARGUMENTS");
+    rc = apdu_alloc_and_encode_response(NULL, &buf, &len);
+    TEST_ASSERT(rc == APDU_ERROR_INVALID_ARGUMENTS, "expected INVALID_ARGUMENTS");
+    TEST_PASS();
+
+    /* NULL buf → 返回 APDU_ERROR_INVALID_ARGUMENTS */
+    {
+        apdu_t ap;
+        memset(&ap, 0, sizeof(ap));
+        ap.resplen = 0;
+        ap.sw1 = 0x90;
+        ap.sw2 = 0x00;
+
+        TEST_START("NULL buf -> INVALID_ARGUMENTS");
+        rc = apdu_alloc_and_encode_response(&ap, NULL, &len);
+        TEST_ASSERT(rc == APDU_ERROR_INVALID_ARGUMENTS, "expected INVALID_ARGUMENTS");
+        TEST_PASS();
+    }
+
+    /* NULL len → 返回 APDU_ERROR_INVALID_ARGUMENTS */
+    {
+        apdu_t ap;
+        memset(&ap, 0, sizeof(ap));
+        ap.resplen = 0;
+        ap.sw1 = 0x90;
+        ap.sw2 = 0x00;
+
+        TEST_START("NULL len -> INVALID_ARGUMENTS");
+        rc = apdu_alloc_and_encode_response(&ap, &buf, NULL);
+        TEST_ASSERT(rc == APDU_ERROR_INVALID_ARGUMENTS, "expected INVALID_ARGUMENTS");
+        TEST_PASS();
+    }
+
+    /* 空指针验证：resplen>0 但 resp=NULL → apdu_encode_response 返回错误，
+     * apdu_alloc_and_encode_response 捕获后返回 APDU_ERROR_INTERNAL */
+    {
+        apdu_t ap;
+        memset(&ap, 0, sizeof(ap));
+        ap.resp = NULL;
+        ap.resplen = 5;  /* > 0 */
+        ap.sw1 = 0x90;
+        ap.sw2 = 0x00;
+
+        TEST_START("resplen>0 but resp=NULL -> INTERNAL (via encode_response)");
+        rc = apdu_alloc_and_encode_response(&ap, &buf, &len);
+        TEST_ASSERT(rc == APDU_ERROR_INTERNAL, "expected INTERNAL");
+        TEST_PASS();
+    }
+}
+
 /* ================ Main ================ */
 
 int main(void)
@@ -711,6 +989,12 @@ int main(void)
     test_decode();
     printf("\n");
     test_set_response();
+    printf("\n");
+    test_get_response_length();
+    printf("\n");
+    test_encode_response();
+    printf("\n");
+    test_alloc_and_encode_response();
 
     printf("\n========================================\n");
     printf("  Results: %d passed, %d failed\n", tests_passed, tests_failed);
