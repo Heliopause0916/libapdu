@@ -87,7 +87,7 @@ static int u8cmp(const u8 *a, const u8 *b, size_t n);
 | Test source | `tests/test_apdu.c` |
 | Test lines | 1004 lines |
 | Test functions | 8 functions |
-| Total test cases | 92 assertions |
+| Total test cases | 75 assertions |
 
 ---
 
@@ -97,15 +97,15 @@ static int u8cmp(const u8 *a, const u8 *b, size_t n);
 
 | API Function | Test Function | Test Count |
 |--------------|---------------|------------|
-| `apdu_get_length()` | `test_get_length()` | 15 |
-| `apdu_encode()` | `test_encode()` | 18 |
-| `apdu_alloc_and_encode()` | `test_alloc_and_encode()` | 8 |
-| `apdu_decode()` | `test_decode()` | 20 |
-| `apdu_set_response()` | `test_set_response()` | 8 |
-| `apdu_get_response_length()` | `test_get_response_length()` | 8 |
-| `apdu_encode_response()` | `test_encode_response()` | 7 |
-| `apdu_alloc_and_encode_response()` | `test_alloc_and_encode_response()` | 8 |
-| **Total** | | **92** |
+| `apdu_get_length()` | `test_get_length()` | 14 |
+| `apdu_encode()` | `test_encode()` | 14 |
+| `apdu_alloc_and_encode()` | `test_alloc_and_encode()` | 6 |
+| `apdu_decode()` | `test_decode()` | 16 |
+| `apdu_set_response()` | `test_set_response()` | 6 |
+| `apdu_get_response_length()` | `test_get_response_length()` | 7 |
+| `apdu_encode_response()` | `test_encode_response()` | 6 |
+| `apdu_alloc_and_encode_response()` | `test_alloc_and_encode_response()` | 6 |
+| **Total** | | **75** |
 
 ### Coverage Categories
 
@@ -129,7 +129,7 @@ static int u8cmp(const u8 *a, const u8 *b, size_t n);
 
 **Purpose:** Test `apdu_get_length()` for calculating encoded byte length.
 
-**Test Count:** 15
+**Test Count:** 14
 
 **Coverage Points:**
 
@@ -163,7 +163,7 @@ static int u8cmp(const u8 *a, const u8 *b, size_t n);
 
 **Purpose:** Test `apdu_encode()` for encoding APDU structures to byte sequences.
 
-**Test Count:** 18
+**Test Count:** 14
 
 **Coverage Points:**
 
@@ -181,7 +181,7 @@ static int u8cmp(const u8 *a, const u8 *b, size_t n);
 | Case4Short lc=2 Le=128 T1 encode | Case 4 Short T=1 | `{0x00, 0xC0, 0x00, 0x01, 0x02, 0xAA, 0xBB, 0x80}` |
 | Case4Ext lc=2 Le=256 T0 encode | Case 4 Extended T=0 | `{0x00, 0xC0, 0x00, 0x01, 0x02, 0xAA, 0xBB}` |
 | Case4Ext lc=2 Le=256 T1 encode | Case 4 Extended T=1 | `{0x00, 0xC0, 0x00, 0x01, 0x00, 0x00, 0x02, 0xAA, 0xBB, 0x01, 0x00}` |
-| Buffer too small | Insufficient buffer size | `APDU_ERROR_INVALID_ARGUMENTS` |
+| Buffer too small (T0 Case1 -> need 5, give 4) | Insufficient buffer size | `APDU_ERROR_INVALID_ARGUMENTS` |
 | NULL out buffer | NULL output buffer | `APDU_ERROR_INVALID_ARGUMENTS` |
 
 **Key Validations:**
@@ -197,7 +197,7 @@ static int u8cmp(const u8 *a, const u8 *b, size_t n);
 
 **Purpose:** Test `apdu_alloc_and_encode()` for memory allocation and encoding.
 
-**Test Count:** 8
+**Test Count:** 6
 
 **Coverage Points:**
 
@@ -224,7 +224,7 @@ static int u8cmp(const u8 *a, const u8 *b, size_t n);
 
 **Purpose:** Test `apdu_decode()` for decoding byte sequences to APDU structures.
 
-**Test Count:** 20
+**Test Count:** 16
 
 **Coverage Points:**
 
@@ -244,6 +244,7 @@ static int u8cmp(const u8 *a, const u8 *b, size_t n);
 | NULL buf -> INVALID_ARGUMENTS | NULL buffer | `APDU_ERROR_INVALID_ARGUMENTS` |
 | NULL apdu -> INVALID_ARGUMENTS | NULL APDU structure | `APDU_ERROR_INVALID_ARGUMENTS` |
 | len < lc -> INVALID_DATA | Insufficient data | `APDU_ERROR_INVALID_DATA` |
+| Trailing garbage? No - valid Case2Short Le=255 | Valid Case2Short with Le=255 | `PASS` |
 | Trailing garbage -> INVALID_DATA | Extra bytes after parse | `APDU_ERROR_INVALID_DATA` |
 
 **Key Validations:**
@@ -260,16 +261,16 @@ static int u8cmp(const u8 *a, const u8 *b, size_t n);
 
 **Purpose:** Test `apdu_set_response()` for setting response data and status words.
 
-**Test Count:** 8
+**Test Count:** 6
 
 **Coverage Points:**
 
 | Test Name | Description | Key Assertions |
 |-----------|-------------|----------------|
-| Set response: 6 bytes, resplen=3 | Data truncation | `sw1 == 'E'`, `sw2 == 'F'`, `resplen == 3` |
-| Set response: resplen bigger than data | Full data copy | `resplen == 3` (all data) |
-| Set response: only SW (len=2) | No response data | `resplen == 0` |
-| Set response: resp=NULL, resplen updated | NULL buffer handling | `resplen == 3`, no copy |
+| Set response: 6 bytes, resplen=3 -> copies 3 bytes, SW=0x45,0x46 | Data truncation | `sw1 == 0x45`, `sw2 == 0x46`, `resplen == 3` |
+| Set response: resplen bigger than data, copies all data | Full data copy | `resplen == 3` (all data) |
+| Set response: only SW (len=2), no data | No response data | `resplen == 0` |
+| Set response: resp=NULL, resplen updated but no copy | NULL buffer handling | `resplen == 3`, no copy |
 | Set response: len=1 -> INTERNAL error | Insufficient length | `APDU_ERROR_INTERNAL` |
 | Set response: len=0 -> INTERNAL error | Zero length | `APDU_ERROR_INTERNAL` |
 
@@ -287,7 +288,7 @@ static int u8cmp(const u8 *a, const u8 *b, size_t n);
 
 **Purpose:** Test `apdu_get_response_length()` for calculating R-APDU encoded length.
 
-**Test Count:** 8
+**Test Count:** 7
 
 **Coverage Points:**
 
@@ -297,9 +298,9 @@ static int u8cmp(const u8 *a, const u8 *b, size_t n);
 | resplen=10 -> returns 12 | Normal response | 12 bytes |
 | resplen=255 -> returns 257 | Maximum short response | 257 bytes |
 | NULL apdu -> returns 0 | NULL parameter | 0 |
-| resplen=SIZE_MAX -> returns 0 | Overflow protection | 0 |
-| resplen=SIZE_MAX-2 -> returns SIZE_MAX | Boundary case | SIZE_MAX |
-| resplen=SIZE_MAX-1 -> returns 0 | Overflow case | 0 |
+| resplen=SIZE_MAX -> returns 0 (overflow) | Overflow protection | 0 |
+| resplen=SIZE_MAX-2 -> returns SIZE_MAX (boundary) | Boundary case | SIZE_MAX |
+| resplen=SIZE_MAX-1 -> returns 0 (overflow) | Overflow case | 0 |
 
 **Key Validations:**
 
@@ -313,7 +314,7 @@ static int u8cmp(const u8 *a, const u8 *b, size_t n);
 
 **Purpose:** Test `apdu_encode_response()` for encoding R-APDU to caller buffer.
 
-**Test Count:** 7
+**Test Count:** 6
 
 **Coverage Points:**
 
@@ -340,7 +341,7 @@ static int u8cmp(const u8 *a, const u8 *b, size_t n);
 
 **Purpose:** Test `apdu_alloc_and_encode_response()` for memory allocation and R-APDU encoding.
 
-**Test Count:** 8
+**Test Count:** 6
 
 **Coverage Points:**
 
@@ -351,7 +352,7 @@ static int u8cmp(const u8 *a, const u8 *b, size_t n);
 | NULL apdu -> INVALID_ARGUMENTS | NULL APDU parameter | `APDU_ERROR_INVALID_ARGUMENTS` |
 | NULL buf -> INVALID_ARGUMENTS | NULL buffer pointer | `APDU_ERROR_INVALID_ARGUMENTS` |
 | NULL len -> INVALID_ARGUMENTS | NULL length pointer | `APDU_ERROR_INVALID_ARGUMENTS` |
-| resplen>0 but resp=NULL -> INTERNAL | Inconsistent state | `APDU_ERROR_INTERNAL` |
+| resplen>0 but resp=NULL -> INTERNAL (via encode_response) | Inconsistent state | `APDU_ERROR_INTERNAL` |
 
 **Key Validations:**
 
@@ -385,51 +386,98 @@ test_apdu.exe  # Windows
 ### Expected Output
 
 ```
-========================================
-  libapdu API Test Suite
-========================================
-
 [apdu_get_length]
   - Case1 T0 -> 5 ... PASS
   - Case1 T1 -> 4 ... PASS
-  ...
+  - Case2Short Le=255 -> 5 ... PASS
+  - Case2Ext T0 -> 5 ... PASS
+  - Case2Ext T1 -> 7 ... PASS
+  - Case3Short lc=10 -> 15 ... PASS
+  - Case3Ext T0 lc=10 -> 15 ... PASS
+  - Case3Ext T1 lc=10 -> 17 ... PASS
+  - Case4Short lc=5 T0 -> 10 ... PASS
+  - Case4Short lc=5 T1 -> 11 ... PASS
+  - Case4Ext lc=5 T0 -> 10 ... PASS
+  - Case4Ext lc=5 T1 -> 14 ... PASS
+  - Invalid cse -> 0 ... PASS
   - Unknown cse 0x99 -> 0 ... PASS
 
 [apdu_encode]
   - Case1 T0 encode ... PASS
   - Case1 T1 encode ... PASS
-  ...
+  - Case2Short Le=255 encode ... PASS
+  - Case2Ext T0 encode ... PASS
+  - Case2Ext T1 encode ... PASS
+  - Case3Short lc=3 encode ... PASS
+  - Case3Ext T0 encode ... PASS
+  - Case3Ext T1 encode ... PASS
+  - Case4Short lc=2 Le=128 T0 encode ... PASS
+  - Case4Short lc=2 Le=128 T1 encode ... PASS
+  - Case4Ext lc=2 Le=256 T0 encode ... PASS
+  - Case4Ext lc=2 Le=256 T1 encode ... PASS
+  - Buffer too small (T0 Case1 -> need 5, give 4) ... PASS
   - NULL out buffer ... PASS
 
 [apdu_alloc_and_encode]
   - Alloc and encode Case3Short ... PASS
-  ...
+  - Alloc and encode Case4Ext T1 ... PASS
+  - NULL apdu returns INVALID_ARGUMENTS ... PASS
+  - NULL buf returns INVALID_ARGUMENTS ... PASS
+  - NULL len returns INVALID_ARGUMENTS ... PASS
   - Invalid cse returns INTERNAL ... PASS
 
 [apdu_decode]
   - Decode Case1 ... PASS
-  ...
+  - Decode Case2Short Le=0 -> 256 ... PASS
+  - Decode Case2Short Le=128 ... PASS
+  - Decode Case2Ext Le=256 ... PASS
+  - Decode Case2Ext Le=0 -> 65536 ... PASS
+  - Decode Case3Short lc=3 ... PASS
+  - Decode Case3Ext lc=3 ... PASS
+  - Decode Case4Short lc=2 Le=128 ... PASS
+  - Decode Case4Ext lc=2 Le=256 ... PASS
+  - Input too short (3 bytes) ... PASS
+  - Input empty (0 bytes) ... PASS
+  - NULL buf -> INVALID_ARGUMENTS ... PASS
+  - NULL apdu -> INVALID_ARGUMENTS ... PASS
+  - len < lc -> INVALID_DATA ... PASS
+  - Trailing garbage? No - valid Case2Short Le=255 ... PASS
   - Trailing garbage -> INVALID_DATA ... PASS
 
 [apdu_set_response]
-  ...
+  - Set response: 6 bytes, resplen=3 -> copies 3 bytes, SW=0x45,0x46 ... PASS
+  - Set response: resplen bigger than data, copies all data ... PASS
+  - Set response: only SW (len=2), no data ... PASS
+  - Set response: resp=NULL, resplen updated but no copy ... PASS
+  - Set response: len=1 -> INTERNAL error ... PASS
   - Set response: len=0 -> INTERNAL error ... PASS
 
 [apdu_get_response_length]
-  ...
+  - resplen=0 -> returns 2 ... PASS
+  - resplen=10 -> returns 12 ... PASS
+  - resplen=255 -> returns 257 ... PASS
+  - NULL apdu -> returns 0 ... PASS
+  - resplen=SIZE_MAX -> returns 0 (overflow) ... PASS
+  - resplen=SIZE_MAX-2 -> returns SIZE_MAX (boundary) ... PASS
   - resplen=SIZE_MAX-1 -> returns 0 (overflow) ... PASS
 
 [apdu_encode_response]
-  ...
+  - Normal encode: resp data + SW ... PASS
+  - Only SW: resplen=0 ... PASS
+  - Buffer too small (need 7, give 5) ... PASS
+  - NULL apdu -> INVALID_ARGUMENTS ... PASS
+  - NULL out -> INVALID_ARGUMENTS ... PASS
   - resplen>0 but resp=NULL -> INVALID_ARGUMENTS ... PASS
 
 [apdu_alloc_and_encode_response]
-  ...
+  - Normal alloc and encode ... PASS
+  - Alloc and encode: only SW (no data) ... PASS
+  - NULL apdu -> INVALID_ARGUMENTS ... PASS
+  - NULL buf -> INVALID_ARGUMENTS ... PASS
+  - NULL len -> INVALID_ARGUMENTS ... PASS
   - resplen>0 but resp=NULL -> INTERNAL (via encode_response) ... PASS
 
-========================================
-  Results: 92 passed, 0 failed
-========================================
+Results: 75 passed, 0 failed
 ```
 
 ### Exit Codes
