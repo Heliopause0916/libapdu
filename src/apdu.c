@@ -319,6 +319,9 @@ size_t apdu_get_response_length(const apdu_t *apdu)
     if (apdu == NULL)
         return 0;
 
+    if (apdu->resplen > SIZE_MAX - 2)
+        return 0;
+
     return apdu->resplen + 2;  /* response data + SW1 + SW2 */
 }
 
@@ -328,6 +331,9 @@ int apdu_encode_response(const apdu_t *apdu, u8 *out, size_t outlen)
     u8    *p;
 
     if (apdu == NULL || out == NULL)
+        return APDU_ERROR_INVALID_ARGUMENTS;
+
+    if (apdu->resplen > 0 && apdu->resp == NULL)
         return APDU_ERROR_INVALID_ARGUMENTS;
 
     len = apdu_get_response_length(apdu);
