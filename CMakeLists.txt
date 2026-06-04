@@ -48,6 +48,11 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 
+# Fix library output name on non-Windows platforms to avoid liblibapdu.a
+if(NOT WIN32)
+    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME apdu)
+endif()
+
 # On Windows with shared library, ensure import library goes to lib directory
 # and DLL goes to bin directory
 if(BUILD_SHARED_LIBS AND WIN32)
